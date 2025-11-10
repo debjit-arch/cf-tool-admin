@@ -1,24 +1,58 @@
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import {
+  BrowserRouter as Router,
+  Switch,
+  Route,
+  Redirect,
+} from "react-router-dom";
+
+import UserList from "./components/Users/UserList";
+import UserForm from "./components/Users/UserForm";
+import DepartmentsList from "./components/Departments/DepartmentList";
+import DepartmentForm from "./components/Departments/DepartmentForm";
+import Login from "./components/Login";
+import PrivateRoute from "./components/PrivateRoute";
+import Navbar from "./components/Navbar";
+import Dashboard from "./components/Dashboard"; // ✅ Add this
+import RiskList from "./components/Risks/RiskList";
+import RiskForm from "./components/Risks/RiskForm";
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <Navbar />
+      <div className="container mt-4">
+        <Switch>
+          <Route exact path="/login" component={Login} />
+
+          {/* ✅ Dashboard route for "/" */}
+          <PrivateRoute exact path="/" component={Dashboard} />
+
+          <PrivateRoute exact path="/users" component={UserList} />
+          <PrivateRoute exact path="/users/create" component={UserForm} />
+          <PrivateRoute exact path="/users/edit/:id" component={UserForm} />
+
+          <PrivateRoute exact path="/departments" component={DepartmentsList} />
+          <PrivateRoute
+            exact
+            path="/departments/create"
+            component={DepartmentForm}
+          />
+          <PrivateRoute
+            exact
+            path="/departments/edit/:id"
+            component={DepartmentForm}
+          />
+
+          <PrivateRoute exact path="/risks" component={RiskList} />
+          <PrivateRoute exact path="/risks/create" component={RiskForm} />
+          <PrivateRoute exact path="/risks/edit/:id" component={RiskForm} />
+
+          {/* Redirect unknown paths to dashboard if logged in, else login */}
+          <PrivateRoute path="*" component={Dashboard} />
+        </Switch>
+      </div>
+    </Router>
   );
 }
 
