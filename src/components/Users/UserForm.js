@@ -64,11 +64,12 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
         name: formData.name,
         email: formData.email,
         role: formData.role,
-        department:
+        departmentId:
           formData.role !== "super_admin"
-            ? { _id: formData.department?._id }
+            ? formData.department?._id || null // send just the _id
             : null,
       };
+      console.log(formData)
       if (!userToEdit) payload.password = formData.password;
 
       if (userToEdit) {
