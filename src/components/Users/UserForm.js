@@ -31,7 +31,7 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
   }, []);
 
   useEffect(() => {
-    if (userToEdit) {
+    if (userToEdit && departments.length > 0) {
       const dept =
         departments.find((d) => d._id === userToEdit.department?._id) || null;
       setFormData({
@@ -69,7 +69,7 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
             ? formData.department?._id || null // send just the _id
             : null,
       };
-      console.log(formData)
+      console.log(formData);
       if (!userToEdit) payload.password = formData.password;
 
       if (userToEdit) {

@@ -5,14 +5,18 @@ import { Link } from "react-router-dom";
 class UserList extends Component {
   state = {
     users: [],
+    departments: [],
     loading: true,
     error: "",
     success: "",
-    searchTerm: "", // <-- for search
+    searchTerm: "",
+    editMode: false,
+    updatingUserId: null, // to show spinner on individual row
   };
 
   componentDidMount() {
     this.fetchUsers();
+    this.fetchDepartments();
   }
 
   fetchUsers = async () => {
@@ -27,8 +31,16 @@ class UserList extends Component {
       this.setState({
         error: err.response?.data?.error || "Failed to fetch users",
         loading: false,
-        success: "",
       });
+    }
+  };
+
+  fetchDepartments = async () => {
+    try {
+      const res = await API.get("/departments");
+      this.setState({ departments: Array.isArray(res.data) ? res.data : [] });
+    } catch (err) {
+      console.error("Failed to fetch departments:", err);
     }
   };
 
@@ -47,10 +59,70 @@ class UserList extends Component {
     this.setState({ searchTerm: e.target.value });
   };
 
-  render() {
-    const { users, loading, error, success, searchTerm } = this.state;
+  handleEditToggle = () => {
+    this.setState((prev) => ({
+      editMode: !prev.editMode,
+      success: "",
+    }));
+  };
 
-    // Filter users based on search term
+  handleRoleChange = (id, newRole) => {
+    this.setState((prev) => ({
+      users: prev.users.map((u) =>
+        u._id === id ? { ...u, role: newRole } : u
+      ),
+    }));
+  };
+
+  handleDeptChange = (id, newDeptId) => {
+    this.setState((prev) => ({
+      users: prev.users.map((u) => {
+        const dept = prev.departments.find((d) => d._id === newDeptId);
+        return u._id === id
+          ? { ...u, department: dept, departmentName: dept?.name || "-" }
+          : u;
+      }),
+    }));
+  };
+
+  handleSave = async (user) => {
+    this.setState({ updatingUserId: user._id });
+    try {
+      const payload = {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        departmentId: user.role !== "super_admin" ? user.department?._id || null : null,
+      };
+      await API.put(`/${user._id}`, payload);
+      this.setState({ success: `${user.name} updated successfully!` });
+      this.fetchUsers();
+    } catch (err) {
+      alert(err.response?.data?.error || "Update failed");
+    } finally {
+      this.setState({ updatingUserId: null });
+    }
+  };
+
+  render() {
+    const {
+      users,
+      departments,
+      loading,
+      error,
+      success,
+      searchTerm,
+      editMode,
+      updatingUserId,
+    } = this.state;
+
+    const roles = [
+      "super_admin",
+      "risk_owner",
+      "risk_manager",
+      "risk_identifier",
+    ];
+
     const filteredUsers = users.filter((u) =>
       [u.name, u.email, u.role, u.departmentName]
         .join(" ")
@@ -74,45 +146,21 @@ class UserList extends Component {
       );
 
     return (
-      <div
-        style={{
-          padding: "20px",
-          maxWidth: "900px",
-          margin: "auto",
-          fontFamily: "Arial, sans-serif",
-        }}
-      >
+      <div style={styles.container}>
         <h2 style={{ textAlign: "center", marginBottom: "20px" }}>Users</h2>
 
-        {success && (
-          <div
-            style={{
-              backgroundColor: "#dff0d8",
-              color: "#3c763d",
-              padding: "10px",
-              borderRadius: "5px",
-              marginBottom: "15px",
-            }}
-          >
-            {success}
-          </div>
-        )}
+        {success && <div style={styles.successBox}>{success}</div>}
 
-        {/* Add User Button */}
-        <Link
-          style={{
-            display: "inline-block",
-            marginBottom: "15px",
-            padding: "8px 16px",
-            backgroundColor: "#5cb85c",
-            color: "#fff",
-            textDecoration: "none",
-            borderRadius: "4px",
-          }}
-          to="/users/create"
-        >
-          Add User
-        </Link>
+        {/* Add and Edit Buttons */}
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <Link style={styles.addBtn} to="/users/create">
+            Add User
+          </Link>
+
+          <button onClick={this.handleEditToggle} style={styles.editMainBtn}>
+            {editMode ? "Cancel Edit" : "Edit User"}
+          </button>
+        </div>
 
         {/* Search Input */}
         <input
@@ -120,24 +168,11 @@ class UserList extends Component {
           placeholder="Search users..."
           value={searchTerm}
           onChange={this.handleSearchChange}
-          style={{
-            width: "100%",
-            padding: "8px 12px",
-            marginBottom: "15px",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            fontSize: "14px",
-          }}
+          style={styles.searchInput}
         />
 
         <div style={{ overflowX: "auto" }}>
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "14px",
-            }}
-          >
+          <table style={styles.table}>
             <thead>
               <tr style={{ backgroundColor: "#d9edf7", textAlign: "left" }}>
                 <th style={styles.th}>Name</th>
@@ -150,10 +185,7 @@ class UserList extends Component {
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan="5"
-                    style={{ textAlign: "center", padding: "12px" }}
-                  >
+                  <td colSpan="5" style={{ textAlign: "center", padding: "12px" }}>
                     No users found.
                   </td>
                 </tr>
@@ -175,18 +207,67 @@ class UserList extends Component {
                   >
                     <td style={styles.td}>{u.name}</td>
                     <td style={styles.td}>{u.email}</td>
-                    <td style={styles.td}>{u.role}</td>
-                    <td style={styles.td}>{u.departmentName}</td>
+
+                    {/* Role */}
                     <td style={styles.td}>
-                      <Link style={styles.editBtn} to={`/users/edit/${u._id}`}>
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => this.handleDelete(u._id)}
-                        style={styles.deleteBtn}
-                      >
-                        Delete
-                      </button>
+                      {editMode ? (
+                        <select
+                          value={u.role}
+                          onChange={(e) =>
+                            this.handleRoleChange(u._id, e.target.value)
+                          }
+                          style={styles.dropdown}
+                        >
+                          {roles.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        u.role
+                      )}
+                    </td>
+
+                    {/* Department */}
+                    <td style={styles.td}>
+                      {editMode && u.role !== "super_admin" ? (
+                        <select
+                          value={u.department?._id || ""}
+                          onChange={(e) =>
+                            this.handleDeptChange(u._id, e.target.value)
+                          }
+                          style={styles.dropdown}
+                        >
+                          <option value="">Select Department</option>
+                          {departments.map((d) => (
+                            <option key={d._id} value={d._id}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        u.departmentName
+                      )}
+                    </td>
+
+                    <td style={styles.td}>
+                      {editMode ? (
+                        <button
+                          onClick={() => this.handleSave(u)}
+                          style={styles.saveBtn}
+                          disabled={updatingUserId === u._id}
+                        >
+                          {updatingUserId === u._id ? "Saving..." : "Save"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => this.handleDelete(u._id)}
+                          style={styles.deleteBtn}
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -200,6 +281,73 @@ class UserList extends Component {
 }
 
 const styles = {
+  container: {
+    padding: "20px",
+    maxWidth: "900px",
+    margin: "auto",
+    fontFamily: "Arial, sans-serif",
+  },
+  successBox: {
+    backgroundColor: "#dff0d8",
+    color: "#3c763d",
+    padding: "10px",
+    borderRadius: "5px",
+    marginBottom: "15px",
+  },
+  addBtn: {
+    display: "inline-block",
+    padding: "8px 16px",
+    backgroundColor: "#5cb85c",
+    color: "#fff",
+    textDecoration: "none",
+    borderRadius: "4px",
+  },
+  editMainBtn: {
+    padding: "8px 16px",
+    backgroundColor: "#0275d8",
+    color: "#fff",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+  },
+  searchInput: {
+    width: "100%",
+    padding: "8px 12px",
+    marginTop: "15px",
+    marginBottom: "15px",
+    border: "1px solid #ccc",
+    borderRadius: "4px",
+    fontSize: "14px",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "14px",
+  },
+  th: { padding: "10px", border: "1px solid #ccc" },
+  td: { padding: "10px", border: "1px solid #ccc" },
+  deleteBtn: {
+    padding: "5px 12px",
+    backgroundColor: "#d9534f",
+    color: "#fff",
+    border: "none",
+    borderRadius: "3px",
+    cursor: "pointer",
+  },
+  saveBtn: {
+    padding: "5px 12px",
+    backgroundColor: "#5bc0de",
+    color: "#fff",
+    border: "none",
+    borderRadius: "3px",
+    cursor: "pointer",
+  },
+  dropdown: {
+    width: "100%",
+    padding: "6px 8px",
+    border: "1px solid #ccc",
+    borderRadius: "4px",
+  },
   loaderContainer: {
     display: "flex",
     flexDirection: "column",
@@ -217,28 +365,9 @@ const styles = {
     animation: "spin 1s linear infinite",
   },
   loadingText: { marginTop: "15px", color: "#374151", fontWeight: "500" },
-  th: { padding: "10px", border: "1px solid #ccc" },
-  td: { padding: "10px", border: "1px solid #ccc" },
-  editBtn: {
-    marginRight: "10px",
-    padding: "5px 12px",
-    backgroundColor: "#5bc0de",
-    color: "#fff",
-    border: "none",
-    borderRadius: "3px",
-    textDecoration: "none",
-  },
-  deleteBtn: {
-    padding: "5px 12px",
-    backgroundColor: "#d9534f",
-    color: "#fff",
-    border: "none",
-    borderRadius: "3px",
-    cursor: "pointer",
-  },
 };
 
-// Add spinner keyframes
+// Spinner keyframes
 const styleSheet = document.styleSheets[0];
 styleSheet.insertRule(
   "@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }",
