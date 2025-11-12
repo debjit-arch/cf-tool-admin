@@ -16,6 +16,7 @@ import Navbar from "./components/Navbar";
 import Dashboard from "./components/Dashboard"; // ✅ Add this
 import RiskList from "./components/Risks/RiskList";
 import RiskForm from "./components/Risks/RiskForm";
+import ChangePassword from "./components/Users/ChangePassword";
 
 function App() {
   return (
@@ -31,6 +32,8 @@ function App() {
           <PrivateRoute exact path="/users" component={UserList} />
           <PrivateRoute exact path="/users/create" component={UserForm} />
           <PrivateRoute exact path="/users/edit/:id" component={UserForm} />
+
+          <PrivateRoute exact path="/change-password" component={ChangePassword} />
 
           <PrivateRoute exact path="/departments" component={DepartmentsList} />
           <PrivateRoute

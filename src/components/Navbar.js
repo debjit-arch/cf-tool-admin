@@ -1,6 +1,15 @@
 import React, { useState } from "react";
 import { useHistory, useLocation } from "react-router-dom";
-import { Home, Users, Building2, LogOut, Menu, X, ShieldCheck } from "lucide-react";
+import {
+  Home,
+  Users,
+  Building2,
+  LogOut,
+  Menu,
+  X,
+  ShieldCheck,
+  Lock,
+} from "lucide-react";
 
 export default function Navbar() {
   const history = useHistory();
@@ -15,8 +24,17 @@ export default function Navbar() {
   const navItems = [
     { label: "Dashboard", path: "/", icon: <Home size={18} /> },
     { label: "Users", path: "/users", icon: <Users size={18} /> },
-    { label: "Departments", path: "/departments", icon: <Building2 size={18} /> },
+    {
+      label: "Departments",
+      path: "/departments",
+      icon: <Building2 size={18} />,
+    },
     { label: "Risks", path: "/risks", icon: <ShieldCheck size={18} /> }, // Added Risks
+    {
+      label: "Change Password",
+      path: "/change-password",
+      icon: <Lock size={18} />,
+    },
   ];
 
   return (
@@ -78,7 +96,6 @@ export default function Navbar() {
 }
 
 // ...styles remain the same
-
 
 const styles = {
   sidebar: {
