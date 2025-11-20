@@ -1,11 +1,25 @@
 import React from "react";
 import { useHistory } from "react-router-dom";
-import { Users, Building2, ShieldCheck } from "lucide-react";
+import { Users, Building2, ShieldCheck, Lock } from "lucide-react";
+import { jwtDecode } from "jwt-decode";
 
 export default function Dashboard() {
   const history = useHistory();
 
-  const tiles = [
+  // Get user role from token
+  const token = localStorage.getItem("token");
+  let userRole = null;
+  if (token) {
+    try {
+      const decoded = jwtDecode(token);
+      userRole = decoded.role; // adjust based on your JWT payload
+    } catch (err) {
+      console.error("Invalid token:", err);
+    }
+  }
+
+  // Define tiles
+  const adminTiles = [
     {
       label: "Users",
       icon: <Users size={28} />,
@@ -25,6 +39,17 @@ export default function Dashboard() {
       path: "/risks",
     },
   ];
+
+  const riskOwnerTiles = [
+    {
+      label: "Change Password",
+      icon: <Lock size={28} />,
+      color: "#ef4444",
+      path: "/change-password",
+    },
+  ];
+
+  const tiles = userRole === "risk_owner" ? riskOwnerTiles : adminTiles;
 
   return (
     <div style={styles.container}>

@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useHistory, useLocation } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
+
 import {
   Home,
   Users,
@@ -21,7 +23,21 @@ export default function Navbar() {
     history.push("/login");
   };
 
-  const navItems = [
+  // Decode token to get user role
+  const token = localStorage.getItem("token");
+  let userRole = null;
+  if (token) {
+    try {
+      const decoded = jwtDecode(token);
+
+      userRole = decoded.role; // adjust based on your JWT payload
+    } catch (err) {
+      console.error("Invalid token:", err);
+    }
+  }
+
+  // Define nav items
+  const adminNavItems = [
     { label: "Dashboard", path: "/", icon: <Home size={18} /> },
     { label: "Users", path: "/users", icon: <Users size={18} /> },
     {
@@ -29,13 +45,25 @@ export default function Navbar() {
       path: "/departments",
       icon: <Building2 size={18} />,
     },
-    { label: "Risks", path: "/risks", icon: <ShieldCheck size={18} /> }, // Added Risks
+    { label: "Risks", path: "/risks", icon: <ShieldCheck size={18} /> },
     {
       label: "Change Password",
       path: "/change-password",
       icon: <Lock size={18} />,
     },
   ];
+
+  const riskOwnerNavItems = [
+    {
+      label: "Change Password",
+      path: "/change-password",
+      icon: <Lock size={18} />,
+    },
+  ];
+
+  // Choose nav items based on role
+  const navItems =
+    userRole === "risk_owner" ? riskOwnerNavItems : adminNavItems;
 
   return (
     <div
@@ -54,7 +82,7 @@ export default function Navbar() {
         {collapsed ? <Menu size={22} /> : <X size={22} />}
       </button>
 
-      {/* Logo / Title */}
+      {/* Logo Section */}
       <div style={styles.logoSection}>
         <img src="/favicon.ico" alt="Logo" style={styles.logoImage} />
         {!collapsed && <h2 style={styles.logoText}>SafeSphere Admin</h2>}
@@ -78,7 +106,7 @@ export default function Navbar() {
         ))}
       </ul>
 
-      {/* Logout Button */}
+      {/* Logout */}
       <div style={styles.logoutSection}>
         <button
           onClick={handleLogout}
@@ -95,8 +123,7 @@ export default function Navbar() {
   );
 }
 
-// ...styles remain the same
-
+// styles remain the same
 const styles = {
   sidebar: {
     height: "100vh",
@@ -128,18 +155,6 @@ const styles = {
     gap: "10px",
     marginBottom: "2rem",
     justifyContent: "center",
-  },
-  logoCircle: {
-    width: "36px",
-    height: "36px",
-    borderRadius: "50%",
-    background: "#2563eb",
-    color: "white",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "600",
-    fontSize: "1rem",
   },
   logoText: {
     fontSize: "1.3rem",
