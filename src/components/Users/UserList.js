@@ -37,8 +37,14 @@ class UserList extends Component {
 
   fetchDepartments = async () => {
     try {
+      const user = JSON.parse(sessionStorage.getItem("user"));
       const res = await API.get("/departments");
-      this.setState({ departments: Array.isArray(res.data) ? res.data : [] });
+      const data = res.data;
+      this.setState({
+        departments: Array.isArray(data)
+          ? data.filter((dept) => dept.organization === user.organization)
+          : [],
+      });
     } catch (err) {
       console.error("Failed to fetch departments:", err);
     }

@@ -13,7 +13,7 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
   const [departments, setDepartments] = useState([]);
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(false);
-
+  const user = JSON.parse(sessionStorage.getItem("user"));
   const roles = [
     "super_admin",
     "root",
@@ -21,12 +21,16 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
     "risk_manager",
     "risk_identifier",
   ];
-
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
         const res = await API.get("/departments");
-        setDepartments(Array.isArray(res.data) ? res.data : []);
+        const d = res.data;
+        setDepartments(
+          Array.isArray(d)
+            ? d.filter((dept) => dept.organization === user.organization)
+            : []
+        );
       } catch (err) {
         console.error("Failed to fetch departments:", err);
       }
@@ -35,7 +39,7 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
       try {
         const res = await API.get("/organizations");
         setOrganizations(Array.isArray(res.data) ? res.data : []);
-        console.log(organizations)
+        console.log(organizations);
       } catch (err) {
         console.error("Failed to fetch organizations:", err);
       }

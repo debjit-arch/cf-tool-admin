@@ -8,13 +8,13 @@ export default function DepartmentsList() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true); // <-- loading state
   const [searchTerm, setSearchTerm] = useState("");
-
+  const user = JSON.parse(sessionStorage.getItem("user"))
   // Fetch all departments
   const fetchDepartments = async () => {
     setLoading(true);
     try {
       const { data } = await API.get("/departments");
-      setDepartments(Array.isArray(data) ? data : []);
+      setDepartments(Array.isArray(data) ? data.filter((dept) => dept.organization === user.organization) : []);
       setError("");
     } catch (err) {
       console.error("Failed to fetch departments:", err);
