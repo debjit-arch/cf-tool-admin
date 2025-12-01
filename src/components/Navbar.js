@@ -11,6 +11,7 @@ import {
   X,
   ShieldCheck,
   Lock,
+  Globe,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -45,6 +46,9 @@ export default function Navbar() {
       path: "/departments",
       icon: <Building2 size={18} />,
     },
+    ...(userRole === "super_admin"
+    ? [{ label: "Organizations", path: "/organizations", icon: <Globe size={18} /> }]
+    : []),
     { label: "Risks", path: "/risks", icon: <ShieldCheck size={18} /> },
     {
       label: "Change Password",

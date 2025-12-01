@@ -16,6 +16,7 @@ import Navbar from "./components/Navbar";
 import Dashboard from "./components/Dashboard"; // ✅ Add this
 import RiskList from "./components/Risks/RiskList";
 import RiskForm from "./components/Risks/RiskForm";
+import Organization from "./components/Organization/Organization";
 import ChangePassword from "./components/Users/ChangePassword";
 
 function App() {
@@ -33,7 +34,11 @@ function App() {
           <PrivateRoute exact path="/users/create" component={UserForm} />
           <PrivateRoute exact path="/users/edit/:id" component={UserForm} />
 
-          <PrivateRoute exact path="/change-password" component={ChangePassword} />
+          <PrivateRoute
+            exact
+            path="/change-password"
+            component={ChangePassword}
+          />
 
           <PrivateRoute exact path="/departments" component={DepartmentsList} />
           <PrivateRoute
@@ -50,7 +55,8 @@ function App() {
           <PrivateRoute exact path="/risks" component={RiskList} />
           <PrivateRoute exact path="/risks/create" component={RiskForm} />
           <PrivateRoute exact path="/risks/edit/:id" component={RiskForm} />
-
+          {/* Organizations ✅ */}
+          <PrivateRoute exact path="/organizations" component={Organization} />
           {/* Redirect unknown paths to dashboard if logged in, else login */}
           <PrivateRoute path="*" component={Dashboard} />
         </Switch>

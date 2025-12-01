@@ -92,7 +92,9 @@ class UserList extends Component {
         name: user.name,
         email: user.email,
         role: user.role,
-        departmentId: user.role !== "super_admin" ? user.department?._id || null : null,
+        departmentId:
+          user.role !== "super_admin" ? user.department?._id || null : null,
+        isAuditor: user.isAuditor || false, // <-- new field
       };
       await API.put(`/${user._id}`, payload);
       this.setState({ success: `${user.name} updated successfully!` });
@@ -102,6 +104,14 @@ class UserList extends Component {
     } finally {
       this.setState({ updatingUserId: null });
     }
+  };
+
+  handleAuditorToggle = (id, checked) => {
+    this.setState((prev) => ({
+      users: prev.users.map((u) =>
+        u._id === id ? { ...u, isAuditor: checked } : u
+      ),
+    }));
   };
 
   render() {
@@ -116,12 +126,7 @@ class UserList extends Component {
       updatingUserId,
     } = this.state;
 
-    const roles = [
-      "super_admin",
-      "risk_owner",
-      "risk_manager",
-      "risk_identifier",
-    ];
+    const roles = ["root", "risk_owner", "risk_manager", "risk_identifier"];
 
     const filteredUsers = users.filter((u) =>
       [u.name, u.email, u.role, u.departmentName]
@@ -179,13 +184,17 @@ class UserList extends Component {
                 <th style={styles.th}>Email</th>
                 <th style={styles.th}>Role</th>
                 <th style={styles.th}>Department</th>
+                <th style={styles.th}>Auditor</th>
                 <th style={styles.th}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: "center", padding: "12px" }}>
+                  <td
+                    colSpan="5"
+                    style={{ textAlign: "center", padding: "12px" }}
+                  >
                     No users found.
                   </td>
                 </tr>
@@ -248,6 +257,21 @@ class UserList extends Component {
                         </select>
                       ) : (
                         u.departmentName
+                      )}
+                    </td>
+                    <td style={styles.td}>
+                      {editMode ? (
+                        <input
+                          type="checkbox"
+                          checked={u.isAuditor || false}
+                          onChange={(e) =>
+                            this.handleAuditorToggle(u._id, e.target.checked)
+                          }
+                        />
+                      ) : u.isAuditor ? (
+                        "Yes"
+                      ) : (
+                        "No"
                       )}
                     </td>
 

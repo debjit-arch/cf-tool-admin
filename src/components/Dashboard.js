@@ -1,6 +1,6 @@
 import React from "react";
 import { useHistory } from "react-router-dom";
-import { Users, Building2, ShieldCheck, Lock } from "lucide-react";
+import { Users, Building2, ShieldCheck, Globe, Lock } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 
 export default function Dashboard() {
@@ -38,6 +38,17 @@ export default function Dashboard() {
       color: "#f59e0b",
       path: "/risks",
     },
+
+    ...(userRole === "super_admin"
+      ? [
+          {
+            label: "Organizations",
+            color: "#806a45ff",
+            path: "/organizations",
+            icon: <Globe size={28} />,
+          },
+        ]
+      : []),
   ];
 
   const riskOwnerTiles = [

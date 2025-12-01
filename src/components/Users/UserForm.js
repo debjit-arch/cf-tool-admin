@@ -8,11 +8,15 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
     password: "",
     role: "risk_identifier",
     department: null,
+    organization: null,
   });
   const [departments, setDepartments] = useState([]);
-  const [loading, setLoading] = useState(false); // <-- Add loading state
+  const [organizations, setOrganizations] = useState([]);
+  const [loading, setLoading] = useState(false);
+
   const roles = [
     "super_admin",
+    "root",
     "risk_owner",
     "risk_manager",
     "risk_identifier",
@@ -27,22 +31,35 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
         console.error("Failed to fetch departments:", err);
       }
     };
+    const fetchOrganizations = async () => {
+      try {
+        const res = await API.get("/organizations");
+        setOrganizations(Array.isArray(res.data) ? res.data : []);
+        console.log(organizations)
+      } catch (err) {
+        console.error("Failed to fetch organizations:", err);
+      }
+    };
     fetchDepartments();
+    fetchOrganizations();
   }, []);
 
   useEffect(() => {
-    if (userToEdit && departments.length > 0) {
+    if (userToEdit && (departments.length > 0 || organizations.length > 0)) {
       const dept =
-        departments.find((d) => d._id === userToEdit.department?._id) || null;
+        departments.find((d) => d._id === userToEdit.departmentId) || null;
+      const org =
+        organizations.find((o) => o._id === userToEdit.organization) || null;
       setFormData({
         name: userToEdit.name || "",
         email: userToEdit.email || "",
         password: "",
         role: userToEdit.role || "risk_identifier",
         department: dept,
+        organization: org,
       });
     }
-  }, [userToEdit, departments]);
+  }, [userToEdit, departments, organizations]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -50,30 +67,41 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
   };
 
   const handleDeptChange = (e) => {
-    const selectedDept =
-      departments.find((d) => d._id === e.target.value) || null;
-    setFormData((prev) => ({ ...prev, department: selectedDept }));
+    const dept = departments.find((d) => d._id === e.target.value) || null;
+    setFormData((prev) => ({ ...prev, department: dept }));
+  };
+
+  const handleOrgChange = (e) => {
+    const org = organizations.find((o) => o._id === e.target.value) || null;
+    setFormData((prev) => ({ ...prev, organization: org }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true); // <-- start loading
+    setLoading(true);
 
     try {
       const payload = {
         name: formData.name,
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         role: formData.role,
-        departmentId:
-          formData.role !== "super_admin"
-            ? formData.department?._id || null // send just the _id
-            : null,
       };
-      console.log(formData);
+
+      if (
+        formData.role === "risk_owner" ||
+        formData.role === "risk_identifier"
+      ) {
+        payload.departmentId = formData.department?._id;
+      }
+
+      if (formData.role === "root") {
+        payload.organization = formData.organization?._id;
+      }
+
       if (!userToEdit) payload.password = formData.password;
 
       if (userToEdit) {
-        await API.put(`/${userToEdit._id}`, payload);
+        await API.put(`/users/${userToEdit._id}`, payload);
         alert("User updated successfully!");
       } else {
         await API.post("/", payload);
@@ -87,24 +115,27 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
         password: "",
         role: "risk_identifier",
         department: null,
+        organization: null,
       });
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "Failed to save user");
     } finally {
-      setLoading(false); // <-- stop loading
+      setLoading(false);
     }
   };
 
   return (
     <div style={styles.card}>
+      {" "}
       <h2 style={styles.heading}>
         {userToEdit ? "Update User" : "Create User"}
-      </h2>
+      </h2>{" "}
       <form onSubmit={handleSubmit}>
-        {/* Name */}
+        {" "}
         <div style={styles.formGroup}>
-          <label style={styles.label}>Full Name</label>
+          {" "}
+          <label style={styles.label}>Full Name</label>{" "}
           <input
             name="name"
             value={formData.name}
@@ -112,12 +143,10 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
             placeholder="Enter full name"
             required
             style={styles.input}
-          />
+          />{" "}
         </div>
-
-        {/* Email */}
         <div style={styles.formGroup}>
-          <label style={styles.label}>Email Address</label>
+          <label style={styles.label}>Email</label>
           <input
             type="email"
             name="email"
@@ -128,8 +157,6 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
             style={styles.input}
           />
         </div>
-
-        {/* Password */}
         {!userToEdit && (
           <div style={styles.formGroup}>
             <label style={styles.label}>Password</label>
@@ -144,8 +171,6 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
             />
           </div>
         )}
-
-        {/* Role */}
         <div style={styles.formGroup}>
           <label style={styles.label}>Role</label>
           <select
@@ -161,13 +186,11 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
             ))}
           </select>
         </div>
-
-        {/* Department */}
-        {formData.role !== "super_admin" && (
+        {(formData.role === "risk_owner" ||
+          formData.role === "risk_identifier") && (
           <div style={styles.formGroup}>
             <label style={styles.label}>Department</label>
             <select
-              name="department"
               value={formData.department?._id || ""}
               onChange={handleDeptChange}
               required
@@ -182,32 +205,39 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
             </select>
           </div>
         )}
-
-        <button type="submit" style={styles.primaryBtn} disabled={loading}>
-          {loading ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-              }}
+        {formData.role === "root" && (
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Organization</label>
+            <select
+              value={formData.organization?._id || ""}
+              onChange={handleOrgChange}
+              required
+              style={styles.input}
             >
-              <div style={styles.spinner}></div>
-              <span>{userToEdit ? "Updating..." : "Creating..."}</span>
-            </div>
-          ) : userToEdit ? (
-            "Update User"
-          ) : (
-            "Create User"
-          )}
+              <option value="">Select Organization</option>
+              {organizations.map((o) => (
+                <option key={o._id} value={o._id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <button type="submit" style={styles.primaryBtn} disabled={loading}>
+          {loading
+            ? userToEdit
+              ? "Updating..."
+              : "Creating..."
+            : userToEdit
+            ? "Update User"
+            : "Create User"}
         </button>
       </form>
     </div>
   );
 }
 
-// Spinner and styles
+// Keep styles same as before
 const styles = {
   card: {
     maxWidth: "500px",
