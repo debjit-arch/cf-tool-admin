@@ -21,7 +21,7 @@ class UserList extends Component {
 
   fetchUsers = async () => {
     try {
-      const { data } = await API.get("/");
+      const { data } = await API.get("/users");
       const users = data.map((u) => ({
         ...u,
         departmentName: u.departmentName || "-",
@@ -38,7 +38,7 @@ class UserList extends Component {
   fetchDepartments = async () => {
     try {
       const user = JSON.parse(sessionStorage.getItem("user"));
-      const res = await API.get("/departments");
+      const res = await API.get("/users/departments");
       const data = res.data;
       this.setState({
         departments: Array.isArray(data)
@@ -53,7 +53,7 @@ class UserList extends Component {
   handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
-      await API.delete(`/${id}`);
+      await API.delete(`/users/${id}`);
       this.setState({ success: "User deleted successfully!" });
       this.fetchUsers();
     } catch (err) {
@@ -102,7 +102,7 @@ class UserList extends Component {
           user.role !== "super_admin" ? user.department?._id || null : null,
         isAuditor: user.isAuditor || false, // <-- new field
       };
-      await API.put(`/${user._id}`, payload);
+      await API.put(`/users/${user._id}`, payload);
       this.setState({ success: `${user.name} updated successfully!` });
       this.fetchUsers();
     } catch (err) {

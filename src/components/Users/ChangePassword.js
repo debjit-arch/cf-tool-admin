@@ -23,7 +23,7 @@ export default function ChangePassword() {
 
     try {
       // ✅ Use your Axios instance (token is auto-added)
-      const res = await API.post("/change-password", {
+      const res = await API.post("/users/change-password", {
         oldPassword,
         newPassword,
       });

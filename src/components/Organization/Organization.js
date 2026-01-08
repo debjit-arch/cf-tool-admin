@@ -19,7 +19,7 @@ class Organization extends Component {
 
   fetchOrganizations = async () => {
     try {
-      const { data } = await API.get("/organizations");
+      const { data } = await API.get("/users/organizations");
       this.setState({
         organizations: data,
         loading: false,
@@ -40,7 +40,7 @@ class Organization extends Component {
       return this.setState({ error: "Organization name is required" });
     this.setState({ loading: true });
     try {
-      const res = await API.post("/organizations", { name: newOrg });
+      const res = await API.post("/users/organizations", { name: newOrg });
       this.setState((prev) => ({
         organizations: [...prev.organizations, res.data],
         newOrg: "",
@@ -61,7 +61,7 @@ class Organization extends Component {
       return;
     this.setState({ updatingOrgId: id });
     try {
-      await API.delete(`/organizations/${id}`);
+      await API.delete(`/users/organizations/${id}`);
       this.setState((prev) => ({
         organizations: prev.organizations.filter((org) => org._id !== id),
         success: "Organization deleted successfully!",

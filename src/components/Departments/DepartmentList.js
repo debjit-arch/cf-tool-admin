@@ -13,7 +13,7 @@ export default function DepartmentsList() {
   const fetchDepartments = async () => {
     setLoading(true);
     try {
-      const { data } = await API.get("/departments");
+      const { data } = await API.get("/users/departments");
       setDepartments(Array.isArray(data) ? data.filter((dept) => dept.organization === user.organization) : []);
       setError("");
     } catch (err) {
@@ -33,7 +33,7 @@ export default function DepartmentsList() {
       return;
 
     try {
-      await API.delete(`/departments/${id}`);
+      await API.delete(`/users/departments/${id}`);
       setDepartments(departments.filter((d) => d._id !== id));
       if (editingDept && editingDept._id === id) setEditingDept(null);
       alert("Department deleted successfully!");

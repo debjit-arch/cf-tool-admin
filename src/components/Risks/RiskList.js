@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useHistory } from "react-router-dom";
 import { Edit2, Trash2, PlusCircle } from "lucide-react";
-import { getToken } from "../../utils/auth";
+import API from "../../api/api";
 
 export default function RiskList() {
   const [risks, setRisks] = useState([]);
@@ -10,16 +10,37 @@ export default function RiskList() {
   const [searchTerm, setSearchTerm] = useState("");
   const history = useHistory();
 
-  const API_URL = "https://cftoolbackend.duckdns.org/api/risks";
-
+  // ✅ FETCH RISKS (axios + interceptors)
   const fetchRisks = async () => {
     try {
-      const res = await fetch(API_URL, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error("Failed to fetch risks");
-      const data = await res.json();
-      setRisks(Array.isArray(data) ? data : []);
+      setLoading(true);
+      
+      // 1. Fetch all risks from the API
+      const res = await API.get("/risks");
+      let allRisks = Array.isArray(res.data) ? res.data : [];
+
+      // 2. Safely retrieve the user object from session storage
+      const userString = sessionStorage.getItem("user");
+      const user = userString ? JSON.parse(userString) : null;
+
+      let filteredRisks = allRisks;
+
+      // 3. Apply organization-wise filtering for "root" users
+      if (user && user.role === "root") {
+        const userOrganization = user.organization;
+
+        if (userOrganization) {
+          // Filter risks to only include those belonging to the user's organization.
+          // ASSUMPTION: Each risk object (r) has an 'organization' field.
+          filteredRisks = allRisks.filter(
+            (r) => r.organization === userOrganization
+          );
+        }
+      }
+
+      // 4. Update the state with the filtered list
+      setRisks(filteredRisks);
+
     } catch (err) {
       console.error(err);
       setError("Failed to fetch risks");
@@ -28,17 +49,19 @@ export default function RiskList() {
     }
   };
 
+  // ✅ DELETE RISK (Using the corrected r._id for state update)
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this risk?")) return;
 
     try {
-      const res = await fetch(`${API_URL}/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!res.ok) throw new Error("Failed to delete");
-      setRisks((prev) => prev.filter((r) => r._id !== id));
+      // NOTE: Assuming the API expects the MongoDB _id for deletion
+      await API.delete(`/risks/${id}`); 
+      
+      // FIX: Filter by the ID passed, which should be the MongoDB _id
+      setRisks((prev) => prev.filter((r) => r.riskId !== id));
+      
     } catch (err) {
+      console.error(err);
       alert("Error deleting risk");
     }
   };
@@ -64,144 +87,141 @@ export default function RiskList() {
 
   if (error)
     return (
-      <p style={{ color: "red", textAlign: "center", marginTop: "20px" }}>
+      <p style={{ color: "red", textAlign: "center", marginTop: 20 }}>
         {error}
       </p>
     );
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif", marginLeft: "200px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-        <h2>All Risks</h2>
-        <button
-          style={{
-            background: "#2563eb",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            padding: "6px 12px",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            cursor: "pointer",
-          }}
-          onClick={() => history.push("/risks/create")}
-        >
-          <PlusCircle size={18} /> Add Risk
+    <div style={{ padding: 20, marginLeft: 200 }}>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <h2>Organizational Risks</h2>
+        <button onClick={() => history.push("/risks/create")} style={styles.button}>
+          <PlusCircle size={18} style={{ marginRight: 5 }} /> Add Risk
         </button>
       </div>
 
       <input
-        type="text"
         placeholder="Search risks..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "8px 12px",
-          marginBottom: "15px",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
-          fontSize: "14px",
-        }}
+        style={styles.searchInput}
       />
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-          <thead>
-            <tr style={{ backgroundColor: "#d9edf7", textAlign: "left" }}>
-              <th style={styles.th}>Risk ID</th>
-              <th style={styles.th}>Description</th>
-              <th style={styles.th}>Department</th>
-              <th style={styles.th}>Risk Type</th>
-              <th style={styles.th}>Risk Level</th>
-              <th style={styles.th}>Risk Score</th>
-              <th style={styles.th}>Actions</th>
+      <table width="100%" border="1" style={styles.table}>
+        <thead>
+          <tr>
+            <th>Risk ID</th>
+            <th>Description</th>
+            <th>Department</th>
+            <th>Type</th>
+            <th>Level</th>
+            <th>Score</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredRisks.length === 0 ? (
+            <tr>
+              <td colSpan="7" style={{ textAlign: "center" }}>
+                No risks found
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {filteredRisks.length === 0 ? (
-              <tr>
-                <td colSpan="7" style={{ textAlign: "center", padding: "12px" }}>
-                  No risks found.
+          ) : (
+            filteredRisks.map((r) => (
+              <tr key={r._id}>
+                <td>{r.riskId}</td>
+                <td>{r.riskDescription}</td>
+                <td>{r.department}</td>
+                <td style={getLevelCellStyle(r.riskType)}>{r.riskType}</td>
+                <td style={getLevelCellStyle(r.riskLevel)}>{r.riskLevel}</td>
+                <td>{r.riskScore}</td>
+                <td>
+                  <Edit2 
+                    onClick={() => history.push(`/risks/edit/${r.riskId}`)} // FIX: Use r._id for edit route
+                    style={styles.actionIcon} 
+                  />
+                  <Trash2 
+                    onClick={() => handleDelete(r.riskId)} // FIX: Use r._id for delete action
+                    style={styles.actionIcon} 
+                  />
                 </td>
               </tr>
-            ) : (
-              filteredRisks.map((r, index) => (
-                <tr
-                  key={r._id}
-                  style={{
-                    backgroundColor: index % 2 === 0 ? "#fff" : "#f3f3f3",
-                    transition: "background-color 0.3s",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#e6f7ff")}
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.backgroundColor = index % 2 === 0 ? "#fff" : "#f3f3f3")
-                  }
-                >
-                  <td style={styles.td}>{r.riskId}</td>
-                  <td style={styles.td}>{r.riskDescription}</td>
-                  <td style={styles.td}>{r.department}</td>
-                  <td style={styles.td}>{r.riskType}</td>
-                  <td style={styles.td}>{r.riskLevel}</td>
-                  <td style={styles.td}>{r.riskScore}</td>
-                  <td style={styles.td}>
-                    <button
-                      style={styles.iconButton}
-                      onClick={() => history.push(`/risks/edit/${r._id}`)}
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      style={{ ...styles.iconButton, color: "#dc2626" }}
-                      onClick={() => handleDelete(r._id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
 
+const getLevelCellStyle = (level) => {
+    let color = '';
+    switch (level) {
+        case 'High':
+        case 'Operational':
+            color = '#f8d7da'; // Light Red
+            break;
+        case 'Medium':
+        case 'Tactical':
+            color = '#fff3cd'; // Light Yellow
+            break;
+        case 'Low':
+        case 'Strategic':
+            color = '#d4edda'; // Light Green
+            break;
+        default:
+            color = '#f8f9fa';
+    }
+    return { backgroundColor: color, fontWeight: 'bold' };
+};
+
 const styles = {
-  th: { padding: "10px", border: "1px solid #ccc" },
-  td: { padding: "10px", border: "1px solid #ccc" },
-  iconButton: {
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    marginRight: 8,
-    color: "#2563eb",
-  },
   loaderContainer: {
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
     height: "100vh",
-    backgroundColor: "#f9fafb",
-    marginLeft: "200px",
+    marginLeft: 200,
   },
   spinner: {
-    width: "50px",
-    height: "50px",
-    border: "6px solid #ddd",
-    borderTop: "6px solid #2563eb",
+    width: 40,
+    height: 40,
+    border: "5px solid #ddd",
+    borderTop: "5px solid #2563eb",
     borderRadius: "50%",
     animation: "spin 1s linear infinite",
   },
-  loadingText: { marginTop: "15px", color: "#374151", fontWeight: "500" },
+  loadingText: { marginTop: 12 },
+  button: {
+      display: 'flex',
+      alignItems: 'center',
+      padding: '8px 15px',
+      backgroundColor: '#2563eb',
+      color: '#fff',
+      border: 'none',
+      borderRadius: '5px',
+      cursor: 'pointer'
+  },
+  searchInput: { 
+      width: "100%", 
+      padding: 8, 
+      margin: "10px 0",
+      borderRadius: 5,
+      border: '1px solid #ccc'
+  },
+  table: {
+    borderCollapse: 'collapse',
+    marginTop: 15,
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  actionIcon: {
+      cursor: 'pointer',
+      marginRight: 10,
+      width: 18,
+      height: 18,
+      color: '#2563eb'
+  }
 };
-
-// Spinner keyframes
-const styleSheet = document.styleSheets[0];
-styleSheet.insertRule(
-  "@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }",
-  styleSheet.cssRules.length
-);

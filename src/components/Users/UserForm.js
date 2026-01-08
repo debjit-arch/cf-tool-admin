@@ -24,7 +24,7 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const res = await API.get("/departments");
+        const res = await API.get("/users/departments");
         const d = res.data;
         setDepartments(
           Array.isArray(d)
@@ -37,7 +37,7 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
     };
     const fetchOrganizations = async () => {
       try {
-        const res = await API.get("/organizations");
+        const res = await API.get("/users/organizations");
         setOrganizations(Array.isArray(res.data) ? res.data : []);
         console.log(organizations);
       } catch (err) {
@@ -108,7 +108,7 @@ export default function UserForm({ userToEdit = null, onSuccess }) {
         await API.put(`/users/${userToEdit._id}`, payload);
         alert("User updated successfully!");
       } else {
-        await API.post("/", payload);
+        await API.post("/users", payload);
         alert("User created successfully!");
       }
 

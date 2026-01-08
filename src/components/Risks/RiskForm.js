@@ -1,15 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useHistory, useParams } from "react-router-dom";
-import { getToken } from "../../utils/auth";
+import API from "../../api/api";
+
+const API_URL = "/risks";
+
+const safeNumber = (value) => Number(value) || 0;
+
+const getLevelColor = (level) => {
+  switch (level) {
+    case "High":
+      return "#f8d7da";
+    case "Medium":
+      return "#fff3cd";
+    case "Low":
+      return "#d4edda";
+    default:
+      return "#f8f9fa";
+  }
+};
 
 export default function RiskForm() {
-  const { id } = useParams(); // if editing
+  const { id } = useParams();
   const history = useHistory();
-
-  const API_URL = "https://cftoolbackend.duckdns.org/api/risks";
 
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
+
   const [formData, setFormData] = useState({
     riskId: "",
     riskDescription: "",
@@ -22,74 +38,114 @@ export default function RiskForm() {
     confidentiality: 1,
     integrity: 1,
     availability: 1,
+    impact: 1,
+    likelihood: 1,
+    existingControls: "",
     additionalControls: "",
     additionalNotes: "",
-    existingControls: "",
     status: "Active",
     deadlineDate: "",
   });
 
-  // Fetch departments
+  const calculateRiskScoreAndLevel = (currentFormData) => {
+    const c = safeNumber(currentFormData.confidentiality);
+    const i = safeNumber(currentFormData.integrity);
+    const a = safeNumber(currentFormData.availability);
+
+    const calculatedImpact = Math.max(c, i, a);
+    const likelihood = safeNumber(currentFormData.likelihood);
+
+    const finalRiskScore = calculatedImpact * likelihood;
+
+    let newRiskLevel = "Low";
+    if (finalRiskScore >= 10) {
+      newRiskLevel = "High";
+    } else if (finalRiskScore >= 5) {
+      newRiskLevel = "Medium";
+    }
+
+    setFormData((p) => ({
+      ...p,
+      impact: calculatedImpact,
+      riskScore: finalRiskScore,
+      riskLevel: newRiskLevel,
+    }));
+  };
+
   const fetchDepartments = async () => {
     try {
-      const res = await fetch(
-        "https://cftoolbackend.duckdns.org/api/departments",
-        {
-          headers: { Authorization: `Bearer ${getToken()}` },
+      const res = await API.get("/users/departments");
+      const userString = sessionStorage.getItem("user");
+      const user = userString ? JSON.parse(userString) : null;
+
+      let filteredDepartments = res.data || [];
+
+      if (user && user.role === "root") {
+        const userOrganization = user.organization;
+
+        if (userOrganization) {
+          filteredDepartments = filteredDepartments.filter(
+            (department) => department.organization === userOrganization
+          );
         }
-      );
-      const data = await res.json();
-      setDepartments(data);
+      }
+
+      setDepartments(filteredDepartments);
     } catch (err) {
-      console.error("Failed to fetch departments:", err);
+      console.error("Failed to fetch departments", err);
     }
   };
 
-  // Fetch risk if editing
   const fetchRisk = async () => {
     try {
-      const res = await fetch(`${API_URL}/${id}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      const data = await res.json();
-      setFormData({
-        riskId: data.riskId || "",
-        riskDescription: data.riskDescription || "",
-        department: data.department || "",
-        riskType: data.riskType || "Strategic",
-        riskLevel: data.riskLevel || "Low",
-        riskScore: data.riskScore || 0,
-        asset: data.asset || "",
-        assetType: data.assetType || "Private",
-        confidentiality: data.confidentiality || 1,
-        integrity: data.integrity || 1,
-        availability: data.availability || 1,
-        additionalControls: data.additionalControls || "",
-        additionalNotes: data.additionalNotes || "",
-        existingControls: data.existingControls || "",
-        status: data.status || "Active",
-        deadlineDate: data.deadlineDate ? data.deadlineDate.split("T")[0] : "",
-      });
+      const res = await API.get(`${API_URL}/${id}`);
+      const r = res.data;
+
+      setFormData((p) => ({
+        ...p,
+        riskId: r.riskId || "",
+        riskDescription: r.riskDescription || "",
+        department: r.department || "",
+        riskType: r.riskType || "Strategic",
+        riskLevel: r.riskLevel || "Low",
+        riskScore: r.riskScore || 0,
+        asset: r.asset || "",
+        assetType: r.assetType || "Private",
+        confidentiality: r.confidentiality || 1,
+        integrity: r.integrity || 1,
+        availability: r.availability || 1,
+        impact: r.impact || 1,
+        likelihood: r.likelihood || 1,
+        existingControls: r.existingControls || "",
+        additionalControls: r.additionalControls || "",
+        additionalNotes: r.additionalNotes || "",
+        status: r.status || "Active",
+        deadlineDate: r.deadlineDate ? r.deadlineDate.split("T")[0] : "",
+      }));
     } catch (err) {
-      console.error("Failed to fetch risk:", err);
+      console.error("Failed to fetch risk", err);
     }
   };
 
   useEffect(() => {
     fetchDepartments();
     if (id) fetchRisk();
+    calculateRiskScoreAndLevel(formData);
   }, [id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
 
-  const calculateRiskScore = () => {
-    const { confidentiality, integrity, availability } = formData;
-    const score =
-      Number(confidentiality) + Number(integrity) + Number(availability);
-    setFormData((prev) => ({ ...prev, riskScore: score }));
+    const updated = { ...formData, [name]: value };
+    setFormData(updated);
+
+    if (
+      ["confidentiality", "integrity", "availability", "likelihood"].includes(
+        name
+      )
+    ) {
+      calculateRiskScoreAndLevel(updated);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -97,23 +153,11 @@ export default function RiskForm() {
     setLoading(true);
 
     try {
-      const method = id ? "PUT" : "POST";
-      const url = id ? `${API_URL}/${id}` : API_URL;
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (!res.ok) throw new Error("Failed to save risk");
+      await API.post(API_URL, formData);
       history.push("/risks");
     } catch (err) {
       console.error(err);
-      alert("Error saving risk");
+      alert("Failed to save risk");
     } finally {
       setLoading(false);
     }
@@ -122,28 +166,37 @@ export default function RiskForm() {
   return (
     <div style={{ padding: "2rem", marginLeft: "200px" }}>
       <h2>{id ? "Edit Risk" : "Add Risk"}</h2>
-      <form onSubmit={handleSubmit} style={{ maxWidth: "600px" }}>
-        <div style={styles.group}>
-          <label>Risk ID</label>
-          <input
-            name="riskId"
-            value={formData.riskId}
-            onChange={handleChange}
-            required
-            style={styles.input}
-          />
-        </div>
 
-        <div style={styles.group}>
-          <label>Risk Description</label>
-          <textarea
-            name="riskDescription"
-            value={formData.riskDescription}
-            onChange={handleChange}
-            required
-            style={styles.textarea}
-          />
-        </div>
+      <form onSubmit={handleSubmit} style={{ maxWidth: 600 }}>
+        {[
+          ["Risk ID", "riskId"],
+          ["Risk Description", "riskDescription", "textarea"],
+          ["Asset", "asset"],
+          ["Existing Controls", "existingControls", "textarea"],
+          ["Additional Controls", "additionalControls", "textarea"],
+          ["Additional Notes", "additionalNotes", "textarea"],
+        ].map(([label, name, type]) => (
+          <div key={name} style={styles.group}>
+            <label>{label}</label>
+            {type === "textarea" ? (
+              <textarea
+                name={name}
+                value={formData[name]}
+                onChange={handleChange}
+                required={name === "riskDescription"}
+                style={styles.textarea}
+              />
+            ) : (
+              <input
+                name={name}
+                value={formData[name]}
+                onChange={handleChange}
+                required={name === "riskId"}
+                style={styles.input}
+              />
+            )}
+          </div>
+        ))}
 
         <div style={styles.group}>
           <label>Department</label>
@@ -154,7 +207,7 @@ export default function RiskForm() {
             required
             style={styles.input}
           >
-            <option value="">Select department</option>
+            <option value="">Select</option>
             {departments.map((d) => (
               <option key={d._id} value={d.name}>
                 {d.name}
@@ -163,157 +216,85 @@ export default function RiskForm() {
           </select>
         </div>
 
+        {[
+          ["Risk Type", "riskType", ["Strategic", "Operational", "Tactical"]],
+          [
+            "Asset Type",
+            "assetType",
+            ["Public", "Private", "Protected", "Confidential"],
+          ],
+          ["Status", "status", ["Open", "WIP", "Closed"]],
+        ].map(([label, name, options]) => (
+          <div key={name} style={styles.group}>
+            <label>{label}</label>
+            <select
+              name={name}
+              value={formData[name]}
+              onChange={handleChange}
+              style={styles.input}
+            >
+              {options.map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+
+        <h3>Impact Assessment (1-3)</h3>
+        {["confidentiality", "integrity", "availability"].map((field) => (
+          <div key={field} style={styles.group}>
+            <label>{field.charAt(0).toUpperCase() + field.slice(1)}</label>
+            <input
+              type="number"
+              min="1"
+              max="3"
+              name={field}
+              value={formData[field]}
+              onChange={handleChange}
+              style={styles.input}
+            />
+          </div>
+        ))}
+
         <div style={styles.group}>
-          <label>Risk Type</label>
-          <select
-            name="riskType"
-            value={formData.riskType}
-            onChange={handleChange}
-            style={styles.input}
-          >
-            <option>Strategic</option>
-            <option>Operational</option>
-            <option>Compliance</option>
-            <option>Financial</option>
-          </select>
+          <label>Auto-Calculated Impact (Max C, I, A)</label>
+          <input readOnly value={formData.impact} style={styles.input} />
         </div>
 
         <div style={styles.group}>
-          <label>Risk Level</label>
-          <select
-            name="riskLevel"
-            value={formData.riskLevel}
-            onChange={handleChange}
-            style={styles.input}
-          >
-            <option>Low</option>
-            <option>Medium</option>
-            <option>High</option>
-          </select>
-        </div>
-
-        <div style={styles.group}>
-          <label>Asset</label>
-          <input
-            name="asset"
-            value={formData.asset}
-            onChange={handleChange}
-            style={styles.input}
-          />
-        </div>
-
-        <div style={styles.group}>
-          <label>Asset Type</label>
-          <select
-            name="assetType"
-            value={formData.assetType}
-            onChange={handleChange}
-            style={styles.input}
-          >
-            <option>Private</option>
-            <option>Public</option>
-          </select>
-        </div>
-
-        <div style={styles.group}>
-          <label>Confidentiality</label>
+          <label>Likelihood (1-4)</label>
           <input
             type="number"
-            name="confidentiality"
-            value={formData.confidentiality}
-            onChange={(e) => {
-              handleChange(e);
-              calculateRiskScore();
-            }}
             min="1"
-            max="5"
+            max="4"
+            name="likelihood"
+            value={formData.likelihood}
+            onChange={handleChange}
+            required
             style={styles.input}
           />
         </div>
 
         <div style={styles.group}>
-          <label>Integrity</label>
+          <label>Risk Score (Impact x Likelihood)</label>
           <input
-            type="number"
-            name="integrity"
-            value={formData.integrity}
-            onChange={(e) => {
-              handleChange(e);
-              calculateRiskScore();
-            }}
-            min="1"
-            max="5"
-            style={styles.input}
-          />
-        </div>
-
-        <div style={styles.group}>
-          <label>Availability</label>
-          <input
-            type="number"
-            name="availability"
-            value={formData.availability}
-            onChange={(e) => {
-              handleChange(e);
-              calculateRiskScore();
-            }}
-            min="1"
-            max="5"
-            style={styles.input}
-          />
-        </div>
-
-        <div style={styles.group}>
-          <label>Risk Score</label>
-          <input
-            name="riskScore"
-            value={formData.riskScore}
             readOnly
-            style={styles.input}
+            value={formData.riskScore}
+            style={{ ...styles.input, fontWeight: "bold" }}
           />
         </div>
 
         <div style={styles.group}>
-          <label>Existing Controls</label>
-          <textarea
-            name="existingControls"
-            value={formData.existingControls}
-            onChange={handleChange}
-            style={styles.textarea}
+          <label>Risk Level (Calculated)</label>
+          <input
+            readOnly
+            value={formData.riskLevel}
+            style={{
+              ...styles.input,
+              fontWeight: "bold",
+              backgroundColor: getLevelColor(formData.riskLevel),
+            }}
           />
-        </div>
-
-        <div style={styles.group}>
-          <label>Additional Controls</label>
-          <textarea
-            name="additionalControls"
-            value={formData.additionalControls}
-            onChange={handleChange}
-            style={styles.textarea}
-          />
-        </div>
-
-        <div style={styles.group}>
-          <label>Additional Notes</label>
-          <textarea
-            name="additionalNotes"
-            value={formData.additionalNotes}
-            onChange={handleChange}
-            style={styles.textarea}
-          />
-        </div>
-
-        <div style={styles.group}>
-          <label>Status</label>
-          <select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            style={styles.input}
-          >
-            <option>Active</option>
-            <option>Closed</option>
-          </select>
         </div>
 
         <div style={styles.group}>
@@ -327,7 +308,7 @@ export default function RiskForm() {
           />
         </div>
 
-        <button type="submit" disabled={loading} style={styles.submitButton}>
+        <button disabled={loading} style={styles.submitButton}>
           {loading ? "Saving..." : "Save Risk"}
         </button>
       </form>
@@ -337,18 +318,18 @@ export default function RiskForm() {
 
 const styles = {
   group: { marginBottom: "1rem", display: "flex", flexDirection: "column" },
-  input: { padding: "8px", borderRadius: "6px", border: "1px solid #ccc" },
+  input: { padding: 8, borderRadius: 6, border: "1px solid #ccc" },
   textarea: {
-    padding: "8px",
-    borderRadius: "6px",
+    padding: 8,
+    borderRadius: 6,
     border: "1px solid #ccc",
-    minHeight: "60px",
+    minHeight: 60,
   },
   submitButton: {
     background: "#2563eb",
-    color: "white",
+    color: "#fff",
     padding: "10px 20px",
-    borderRadius: "8px",
+    borderRadius: 8,
     border: "none",
     cursor: "pointer",
   },

@@ -14,10 +14,10 @@ export default function DepartmentForm({ deptToEdit = null, onSuccess }) {
 
     try {
       if (deptToEdit) {
-        await API.put(`/departments/${deptToEdit._id}`, { name });
+        await API.put(`/users/departments/${deptToEdit._id}`, { name });
         alert("Department updated successfully!");
       } else {
-        await API.post("/departments", { name });
+        await API.post("/users/departments", { name });
         alert("Department created successfully!");
       }
       setName("");
