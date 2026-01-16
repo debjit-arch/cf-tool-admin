@@ -88,8 +88,8 @@ export default function Navbar() {
 
       {/* Logo Section */}
       <div style={styles.logoSection}>
-        <img src="/favicon.ico" alt="Logo" style={styles.logoImage} />
-        {!collapsed && <h2 style={styles.logoText}>SafeSphere Admin</h2>}
+        <img src="/favicon.png" alt="Logo" style={styles.logoImage} />
+        {!collapsed && <h2 style={styles.logoText}>CalVant Admin</h2>}
       </div>
 
       {/* Navigation Links */}
